@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { canSelectJelly, createInitialGame, resolveJellyTurn } from './game/engine'
+import { canSelectJelly, countAlivePixels, createInitialGame, resolveJellyTurn } from './game/engine'
 import type { GameState, JellySource } from './game/types'
 import { getLevel, LEVELS } from './levels'
 import { Orbit } from './components/Orbit'
@@ -26,9 +26,11 @@ export default function App() {
   const [game, setGame] = useState<GameState | null>(null)
   const [displayPixels, setDisplayPixels] = useState<GameState['pixels']>([])
   const [activeJelly, setActiveJelly] = useState<GameState['activeJelly']>(null)
-  const [popId, setPopId] = useState<string | null>(null)
+  const [popIds, setPopIds] = useState<string[]>([])
+  const [bubbleId, setBubbleId] = useState<string | null>(null)
   const [revealIds, setRevealIds] = useState<string[]>([])
   const [attackCount, setAttackCount] = useState(0)
+  const [attackIndex, setAttackIndex] = useState(0)
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const timerRef = useRef<number | null>(null)
 
@@ -53,9 +55,11 @@ export default function App() {
     setGame(initial)
     setDisplayPixels(initial.pixels)
     setActiveJelly(null)
-    setPopId(null)
+    setPopIds([])
+    setBubbleId(null)
     setRevealIds([])
     setAttackCount(0)
+    setAttackIndex(0)
     setScreen('game')
     setTutorialOpen(levelId === 1 && !progress.tutorialComplete)
   }
@@ -85,33 +89,49 @@ export default function App() {
     setActiveJelly(result.selectedJelly)
     setAttackCount(result.events.length)
     setDisplayPixels(result.beforePixels)
-    setPopId(null)
+    setPopIds([])
+    setBubbleId(null)
     setRevealIds([])
-    setGame({ ...result.state, phase: 'resolving' })
+    setAttackIndex(0)
+    setGame({ ...game, activeJelly: result.selectedJelly, phase: 'resolving' })
 
     let step = 0
+    let playbackPixels = result.beforePixels
     const advance = () => {
-      if (step < result.events.length) {
-        const event = result.events[step]
-        setDisplayPixels(event.pixelsAfter)
-        setPopId(event.poppedId)
-        setRevealIds(event.newlyExposedIds)
-        step += 1
-        timerRef.current = window.setTimeout(advance, 125)
+      if (step >= result.events.length) {
+        timerRef.current = window.setTimeout(() => {
+          setDisplayPixels(result.state.pixels)
+          setGame(result.state)
+          setActiveJelly(null)
+          setPopIds([])
+          setBubbleId(null)
+          setRevealIds([])
+          setAttackIndex(0)
+          timerRef.current = null
+        }, result.events.length > 0 ? 260 : 300)
         return
       }
 
+      const event = result.events[step]
+      setDisplayPixels(playbackPixels)
+      setBubbleId(event.poppedId)
+      setRevealIds([])
+      setAttackIndex(step)
+
       timerRef.current = window.setTimeout(() => {
-        setDisplayPixels(result.state.pixels)
-        setGame(result.state)
-        setActiveJelly(null)
-        setPopId(null)
-        setRevealIds([])
-        timerRef.current = null
-      }, result.events.length > 0 ? 230 : 300)
+        setDisplayPixels(event.pixelsAfter)
+        setBubbleId(null)
+        setPopIds((current) => current.includes(event.poppedId) ? current : [...current, event.poppedId])
+        setRevealIds(event.newlyExposedIds)
+        setAttackIndex(step + 1)
+        setActiveJelly({ ...result.selectedJelly!, energy: result.selectedJelly!.energy - step - 1 })
+        playbackPixels = event.pixelsAfter
+        step += 1
+        timerRef.current = window.setTimeout(advance, 105)
+      }, 95)
     }
 
-    timerRef.current = window.setTimeout(advance, 95)
+    timerRef.current = window.setTimeout(advance, 80)
   }
 
   function retryLevel() {
@@ -136,6 +156,10 @@ export default function App() {
 
   const queueSelectable = (jellyId: string) => game.phase !== 'resolving' && canSelectJelly(game, 'queue', jellyId)
   const poolSelectable = (jellyId: string) => game.phase !== 'resolving' && canSelectJelly(game, 'pool', jellyId)
+  const hiddenActiveId = game.phase === 'resolving' ? activeJelly?.id : null
+  const visibleQueue = game.queue.filter((jelly) => jelly.id !== hiddenActiveId)
+  const visiblePool = game.pool.filter((jelly) => jelly.id !== hiddenActiveId)
+  const displayedRemaining = game.phase === 'resolving' ? countAlivePixels(displayPixels) : game.remainingPixelCount
 
   return (
     <div className="app-shell">
@@ -162,21 +186,21 @@ export default function App() {
               </div>
               <div className="remaining-counter">
                 <span>PIXELS LEFT</span>
-                <strong>{game.remainingPixelCount}</strong>
+                <strong>{displayedRemaining}</strong>
               </div>
             </div>
 
             <div className="board-card">
               <div className="board-note board-note--top"><span className="note-line" /> outside → inside</div>
               <div className="board-orbit-wrap">
-                <Orbit activeJelly={activeJelly} resolving={game.phase === 'resolving'} attackCount={attackCount} />
+                <Orbit activeJelly={activeJelly} resolving={game.phase === 'resolving'} attackCount={attackCount} attackIndex={attackIndex} />
                 <div className="art-board">
                   <div className="art-board-inner">
                     <div className="art-board-header">
                       <span className="board-chip">PIXEL ART</span>
                       <span className="board-grid-size">{currentLevel.width} × {currentLevel.height}</span>
                     </div>
-                    <PixelGrid pixels={displayPixels} popId={popId} revealIds={revealIds} label="Current Jelly Orbit pixel art" />
+                    <PixelGrid pixels={displayPixels} popIds={popIds} bubbleId={bubbleId} revealIds={revealIds} label="Current Jelly Orbit pixel art" />
                     <div className="art-board-footer">
                       <span><i className="live-dot" /> {game.phase === 'resolving' ? 'orbit resolving' : 'choose your next colour'}</span>
                       <span className="tiny-orbit-mark">◌</span>
@@ -195,12 +219,12 @@ export default function App() {
                   <span className="section-eyebrow">YOUR RESERVE</span>
                   <h2 id="pool-heading">Jelly Pool</h2>
                 </div>
-                <span className={`pool-capacity ${game.pool.length >= game.poolSize ? 'pool-capacity--full' : ''}`}>{game.pool.length}/{game.poolSize}</span>
+                <span className={`pool-capacity ${visiblePool.length >= game.poolSize ? 'pool-capacity--full' : ''}`}>{visiblePool.length}/{game.poolSize}</span>
               </div>
               <p className="panel-helper">Energy left over waits here.</p>
               <div className="pool-slots">
                 {Array.from({ length: game.poolSize }, (_, index) => {
-                  const jelly = game.pool[index]
+                  const jelly = visiblePool[index]
                   return jelly ? (
                     <JellyButton
                       key={jelly.id}
@@ -227,7 +251,7 @@ export default function App() {
               </div>
               <p className="panel-helper">Choose a colour. The orbit finds its matching layer.</p>
               <div className="queue-list">
-                {game.queue.length > 0 ? game.queue.map((jelly) => (
+                {visibleQueue.length > 0 ? visibleQueue.map((jelly) => (
                   <JellyButton
                     key={jelly.id}
                     jelly={jelly}
