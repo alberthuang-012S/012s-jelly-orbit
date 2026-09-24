@@ -1,23 +1,29 @@
 # Jelly Orbit · 水母的海洋小旅行
 
-A five-stage, mobile-first playable rebuild. Send jellyfish around a moving track, reveal matching colors, and collect ocean pixel art.
+A ten-stage, mobile-first playable rebuild. Send jellyfish around a moving track, reveal matching colors, and collect ocean pixel art.
 
 ## Gameplay
 
 - Tap the front jellyfish in any of three queues. Up to three travel together, with slightly staggered launches.
 - Each swimmer fires inward along its current side. The first solid cube blocks everything behind it; a matching hit spends one bubble.
+- From stage 6, snowflake-marked cubes have an ice shell. The first matching bubble removes the shell but leaves the cube blocking the ray; the second removes the cube. Both hits consume ammo. Stage ammo includes the extra ice hits.
 - Empty swimmers leave immediately. Those with bubbles remaining return after one lap to a five-slot waiting bay and can be launched again.
 - Each traveling swimmer reserves one waiting slot, shown by a return arrow. A full bay still lets its own swimmers relaunch.
 - Clear every cube to win. Loss is checked only after all swimmers settle, when no waiting swimmer can hit anything and no new queue can be opened.
 - Undo restores the complete state before the last launch, including other swimmers in flight. Hints suggest locally useful colors; they do not guarantee optimal play.
 - Pause, replay, 2× speed, optional sound, and help are included. Dialogs and hidden browser tabs pause simulation.
+- Bubble flight, impact rings, ice fragments and swimmer recoil reinforce hits. Consecutive hits within 12 simulation ticks build a combo and rising note sequence; best combo and launch count appear at the end. Clearing a whole color triggers a brief celebration. Combos are cosmetic and never affect solvability.
 
 The first two stages introduce the loop. Later stages place inner colors ahead of some outer-layer ammo, creating queue and waiting-slot decisions.
 
+Stages 6–10 form the Frost Sea chapter: ice introduction, frozen entrance, a lighter heart-shaped stage, twin reefs, and an aurora crystal finale. An illustrated one-time introduction explains the new mechanic. Existing five-stage saves automatically continue at stage 6.
+
 ## Core Systems
 
-- `src/game/tide.ts`: immutable deterministic simulation, inward rays, launch/dock rules, five new stages and local hints.
-- `src/game/tide.test.ts`: capacity, ammo conservation, simultaneous hits, deadlock timing, and verified sequential/interleaved winning routes for all five stages.
+- `src/game/tide.ts`: immutable deterministic simulation, inward rays, ice, launch/dock rules, ten stages and local hints. Lowercase color letters define iced cubes in the hand-authored maps.
+- `src/game/tide.test.ts`: capacity, ammo conservation, simultaneous hits, ice blocking, deadlock timing, and verified sequential/interleaved winning routes for all ten stages.
+- `src/components/TideEffects.tsx`: bounded visual effects and color-clear celebrations, with reduced-motion support.
+- `src/storage/tideProgress.ts`: backwards-compatible stage completion storage and new-mechanic tutorial memory.
 - `src/App.tsx`: interface, clock, undo snapshots, local completion storage and synthesized audio.
 - `src/styles.css`: responsive ocean layout, hit feedback and reduced-motion support.
 - Existing artwork from `reference/jellyfish-3d` is reused.
@@ -26,7 +32,7 @@ The previous turn-based engine, solver, levels and tests remain as reference. Th
 
 Completed stages are stored under `jellyOrbitTideV2`, without changing previous-version progress. Reloading restarts the current stage and keeps unlocks. Audio starts muted. Google Fonts is optional, with system-font fallback.
 
-This first prototype contains five stages. Difficulty and pacing still need real-player playtesting before expanding the catalog. Accounts, monetization and daily challenges are outside this version.
+This second prototype contains ten stages. Difficulty and pacing still need real-player playtesting before expanding the catalog. Accounts, monetization and daily challenges are outside this version.
 
 ## Development
 

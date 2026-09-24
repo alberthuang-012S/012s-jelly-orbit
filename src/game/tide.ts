@@ -4,23 +4,26 @@ export const COLORS: JellyColor[] = ['yellow', 'pink', 'aqua', 'green', 'purple'
 export const COLOR_NAMES: Record<JellyColor, string> = { yellow: '檸檬', pink: '蜜桃', aqua: '海藍', green: '青蘋果', purple: '葡萄' }
 export const HEX: Record<JellyColor, string> = { yellow: '#ffc947', pink: '#ff82ac', aqua: '#55d7e0', green: '#93d772', purple: '#b29aee' }
 export type Tile = JellyColor | null
-export type TideLevel = { id: number; name: string; subtitle: string; icon: string; size: number; tiles: Tile[]; lanes: JellyUnit[][] }
+export type TideLevel = { id: number; name: string; subtitle: string; icon: string; size: number; tiles: Tile[]; ice: number[]; lanes: JellyUnit[][] }
 export type Swimmer = JellyUnit & { age: number }
-export type Shot = { id: string; color: JellyColor; from: [number, number]; target: number }
-export type TideState = { tiles: Tile[]; lanes: JellyUnit[][]; pool: JellyUnit[]; swimmers: Swimmer[]; tick: number; shots: Shot[]; phase: 'playing' | 'won' | 'lost'; launched: number }
+export type Shot = { id: string; color: JellyColor; from: [number, number]; target: number; sourceId: string; tick: number; cracked: boolean }
+export type TideState = { tiles: Tile[]; ice: number[]; lanes: JellyUnit[][]; pool: JellyUnit[]; swimmers: Swimmer[]; tick: number; shots: Shot[]; effects: Shot[]; combo: number; bestCombo: number; lastHitTick: number; clearedColors: JellyColor[]; phase: 'playing' | 'won' | 'lost'; launched: number }
 export const CAPACITY = 3
 export const POOL_SIZE = 5
 export const TICK_MS = 75
 
 const charColor: Record<string, JellyColor> = { Y: 'yellow', P: 'pink', A: 'aqua', G: 'green', U: 'purple' }
 function level(id: number, name: string, subtitle: string, icon: string, rows: string[], order: JellyColor[]): TideLevel {
-  const tiles = rows.join('').split('').map(c => charColor[c] ?? null)
+  if (rows.some(row => row.length !== rows.length || /[^YPAGUypagu.]/.test(row))) throw new Error(`Invalid stage ${id}`)
+  const characters = rows.join('').split('')
+  const tiles = characters.map(c => charColor[c.toUpperCase()] ?? null)
+  const ice = characters.map(c => /[ypagu]/.test(c) ? 1 : 0)
   const lanes: JellyUnit[][] = [[], [], []]
   let index = 0
   for (const color of order) {
-    let count = tiles.filter(t => t === color).length
+    let count = tiles.reduce((sum, tile, i) => sum + (tile === color ? 1 + ice[i] : 0), 0)
     while (count > 0) {
-      const energy = Math.min(count, id === 1 ? 8 : 10)
+      const energy = Math.min(count, id === 1 ? 8 : id >= 6 ? [6, 10, 8][index % 3] : 10)
       lanes[index % 3].push({ id: `${id}-${index++}`, color, energy })
       count -= energy
     }
@@ -29,7 +32,7 @@ function level(id: number, name: string, subtitle: string, icon: string, rows: s
   // Players can keep another lane moving or spend a dock to uncover it.
   if (id >= 3 && lanes[1].length > 1) [lanes[1][0], lanes[1][1]] = [lanes[1][1], lanes[1][0]]
   if (id >= 5 && lanes[2].length > 1) [lanes[2][0], lanes[2][1]] = [lanes[2][1], lanes[2][0]]
-  return { id, name, subtitle, icon, size: rows.length, tiles, lanes }
+  return { id, name, subtitle, icon, size: rows.length, tiles, ice, lanes }
 }
 
 export const TIDE_LEVELS = [
@@ -48,10 +51,25 @@ export const TIDE_LEVELS = [
   level(5, '彩虹水母', '把整片海的顏色，都收進圖鑑。', '♧', [
     '...YYYYYY...', '..YPPPPPPY..', '.YPAAAAAAPY.', 'YPAGGGGGGAPY', 'YPAGUUUUGAPY', 'YPAGUUUUGAPY', 'YPAGGGGGGAPY', '.YPPPPPPPPY.', '..YYYYYYYY..', '..P.A..A.P..', '..P.A..A.P..', '..P......P..',
   ], ['yellow', 'pink', 'aqua', 'green', 'purple']),
+  level(6, '初雪海灣', '❄ 同色泡泡先破冰，再命中一次才會消除。', '❄', [
+    '..YyyY..', '.YPPPPY.', 'YPPaaPPY', 'YPAAAAPY', 'YPAAAAPY', 'YPPaaPPY', '.YPPPPY.', '..YyyY..',
+  ], ['yellow', 'pink', 'aqua']),
+  level(7, '冰晶之門', '先打開冰封入口，再派內層顏色的夥伴。', '◇', [
+    '..YYyyYY..', '.YPPPPPPY.', 'YPAAAAAAPY', 'YPAGGGGAPY', 'yPaGUUGaPy', 'yPaGUUGaPy', 'YPAGGGGAPY', 'YPAAAAAAPY', '.YPPPPPPY.', '..YYyyYY..',
+  ], ['yellow', 'pink', 'aqua', 'green', 'purple']),
+  level(8, '暖流小憩', '放慢一點，讓小泡泡完成最後一擊。', '♥', [
+    '.YY..YY.', 'YPPYYPPY', 'YPpPPpPY', 'YPGGGGPY', '.YPGGPY.', '..YPPY..', '...YY...', '........',
+  ], ['yellow', 'pink', 'green']),
+  level(9, '雙生冰礁', '兩座冰礁共享小棧，留空位給返航夥伴。', '◈', [
+    '.Yyy..yyY.', 'YPPPYYPPPY', 'YPaPYYPaPY', 'YPGPYYPGPY', '.YpY..YpY.', '.YpY..YpY.', 'YPUPYYPUPY', 'YPAPYYPAPY', 'YPPPYYPPPY', '.YYY..YYY.',
+  ], ['yellow', 'pink', 'aqua', 'green', 'purple']),
+  level(10, '極光水晶', '破冰、返航、再出發。把整片極光帶回家。', '✧', [
+    '....YyyY....', '...YPPPPY...', '..YPAAAAPY..', '.YPAggggAPY.', 'YPAGUUUUGAPY', 'yPaGUuuUGaPy', 'yPaGUuuUGaPy', 'YPAGUUUUGAPY', '.YPAggggAPY.', '..YPAAAAPY..', '...YPPPPY...', '....YyyY....',
+  ], ['yellow', 'pink', 'aqua', 'green', 'purple']),
 ]
 
 export function createTide(level: TideLevel): TideState {
-  return { tiles: [...level.tiles], lanes: level.lanes.map(l => l.map(j => ({ ...j }))), pool: [], swimmers: [], tick: 0, shots: [], phase: 'playing', launched: 0 }
+  return { tiles: [...level.tiles], ice: [...level.ice], lanes: level.lanes.map(l => l.map(j => ({ ...j }))), pool: [], swimmers: [], tick: 0, shots: [], effects: [], combo: 0, bestCombo: 0, lastHitTick: -100, clearedColors: [], phase: 'playing', launched: 0 }
 }
 export function orbitPoint(age: number, size: number): [number, number] {
   const progress = Math.max(0, Math.min(age / (size * 8), .99999)) * 4
@@ -92,22 +110,30 @@ export function launch(state: TideState, source: 'lane' | 'pool', index: number)
 }
 export function stepTide(state: TideState, size: number): TideState {
   if (state.phase !== 'playing') return state
-  const next: TideState = { ...state, tiles: [...state.tiles], pool: [...state.pool], swimmers: [], tick: state.tick + 1, shots: [] }
+  const next: TideState = { ...state, tiles: [...state.tiles], ice: [...state.ice], pool: [...state.pool], swimmers: [], tick: state.tick + 1, shots: [], effects: state.effects.filter(shot => state.tick - shot.tick < 7), clearedColors: [] }
   for (const original of state.swimmers) {
     const jelly = { ...original }
     if (jelly.age < 0) { next.swimmers.push({ ...jelly, age: jelly.age + 1 }); continue }
     const ray = Math.floor(jelly.age / 2)
     const target = rayTarget(next.tiles, size, Math.floor(ray / size), ray % size)
     if (target !== null && next.tiles[target] === jelly.color) {
-      next.tiles[target] = null
+      const cracked = next.ice[target] > 0
+      if (cracked) next.ice[target]--
+      else next.tiles[target] = null
       jelly.energy--
-      next.shots.push({ id: `${state.tick}-${jelly.id}`, color: jelly.color, from: orbitPoint(jelly.age, size), target })
+      next.shots.push({ id: `${state.tick}-${jelly.id}`, color: jelly.color, from: orbitPoint(jelly.age, size), target, sourceId: jelly.id, tick: next.tick, cracked })
+      next.combo = next.tick - next.lastHitTick <= 12 ? next.combo + 1 : 1
+      next.lastHitTick = next.tick
+      next.bestCombo = Math.max(next.bestCombo, next.combo)
+      if (!cracked && !next.tiles.includes(jelly.color)) next.clearedColors.push(jelly.color)
     }
     jelly.age++
     if (jelly.energy <= 0) continue
     if (jelly.age >= size * 8) next.pool.push({ id: jelly.id, color: jelly.color, energy: jelly.energy })
     else next.swimmers.push(jelly)
   }
+  next.effects.push(...next.shots)
+  if (next.tick - next.lastHitTick > 12) next.combo = 0
   if (next.tiles.every(t => t === null)) next.phase = 'won'
   else if (!next.swimmers.length) {
     const usefulPool = next.pool.some(j => canHit(next, j.color, size))

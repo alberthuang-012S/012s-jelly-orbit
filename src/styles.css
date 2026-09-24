@@ -1278,3 +1278,117 @@ img{
 .status-message.has-notice {
   color: #747b36;
 }
+
+/* Frost Sea: one new rule, visible on both the board and the introduction. */
+.frost-field .track-base { stroke: #dcecf1; fill: #ecf6fa65; }
+.frost-field .track-shadow { stroke: #c1dce5; }
+.frost-field .track-arrows { stroke: #8bb9c8; }
+.ice-counter { color: #619bb0 !important; margin-right: 9px; }
+.pixel.frozen {
+  outline: 1px solid #effeff;
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 2px #e3fcffb8, inset 0 0 8px #fff;
+}
+.pixel.frozen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #fff9 0 22%, transparent 23% 53%, #e3faff99 54% 68%, transparent 69%);
+}
+.ice-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: clamp(8px, 1.1vw, 14px);
+  line-height: 1;
+  text-shadow: 0 1px 2px #3a7786;
+}
+.ice-intro { margin-top: 20px; text-align: center; }
+.ice-intro p { color: #788f95; font-size: 12px; line-height: 1.9; }
+.ice-intro strong { color: #448ca3; }
+.ice-demo { display: flex; justify-content: space-between; align-items: center; margin: 25px -8px; gap: 5px; }
+.ice-demo>div { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ice-demo b { font-size: 10px; font-weight: 500; white-space: nowrap; color: #658591; }
+.ice-demo>i { font-style: normal; color: #b1cbd2; margin-top: -24px; }
+.demo-cube { width: 48px; height: 48px; display: grid; place-items: center; background: #ffc947; border-radius: 9px; box-shadow: inset 0 -5px #e8b239, inset 0 3px #ffdf8b; }
+.demo-cube.frozen { color: white; font-size: 29px; border: 3px solid #ceeff9; background: linear-gradient(135deg, #f3fbfcaa 0 30%, #ffc947aa 31% 70%, #e9faffbb 71%), #ffd566; box-shadow: 0 3px 0 #afd8e2; text-shadow: 0 1px 3px #5796aa; }
+.demo-pop { display: grid; place-items: center; width: 48px; height: 48px; color: #eac361; font-size: 40px; }
+.ice-tip { display: block; margin-top: 20px; padding: 12px; background: #eaf4f6; color: #6794a0; border-radius: 12px; font-size: 11px; }
+
+/* Effects live for a short simulation window, independent of subsequent hits. */
+.flying-bubble {
+  transform-box: view-box;
+  animation: bubble-flight var(--flight) cubic-bezier(.2,.6,.4,1) both;
+}
+.bubble-impact {
+  opacity: 0;
+  animation: bubble-impact var(--effect) var(--flight) ease-out both;
+  stroke: var(--burst);
+  stroke-width: .85;
+  fill: none;
+  stroke-linecap: round;
+}
+.bubble-impact.ice-impact { stroke: #9bdcec; stroke-width: 1.2; }
+.impact-ring { stroke-width: .5; }
+.swimmer .jelly-art { transition: transform 90ms ease-out; }
+.swimmer.firing .jelly-art { transform: scale(.9, 1.1) rotate(-5deg); }
+.combo-badge {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #789f87;
+  pointer-events: none;
+}
+.combo-badge b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+.combo-badge span { font-size: 9px; letter-spacing: 1px; }
+.combo-great { color: #bf9143; }
+.color-celebration {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  padding: 9px 16px;
+  border-radius: 30px;
+  background: #fffdf1ed;
+  border: 1px solid #e5ce80;
+  box-shadow: 0 5px 18px #6c684c15;
+  white-space: nowrap;
+  color: #a88430;
+  font-size: 12px;
+  font-weight: 700;
+  animation: color-celebrate 950ms ease-out both;
+  pointer-events: none;
+}
+.result-stats { display: flex; justify-content: center; gap: 32px; margin-top: 20px; }
+.result-stats span { display: flex; flex-direction: column; color: #90a38c; font-size: 10px; gap: 4px; }
+.result-stats b { font-size: 23px; font-weight: 800; color: #648b70; }
+.collection-list { max-height: 470px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c6d7c3 transparent; padding-right: 5px; }
+.collection-card { flex-shrink: 0; }
+.is-paused .bubble-effects *, .is-paused .color-celebration { animation-play-state: paused !important; }
+@keyframes bubble-flight {
+  0% { transform: translate(var(--dx), var(--dy)); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(0, 0); opacity: 0; }
+}
+@keyframes bubble-impact {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes color-celebrate {
+  0% { opacity: 0; margin-top: 9px; }
+  15%, 65% { opacity: 1; margin-top: 0; }
+  100% { opacity: 0; margin-top: -9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flying-bubble, .bubble-impact { display: none; }
+  .swimmer.firing .jelly-art { transform: none; }
+}

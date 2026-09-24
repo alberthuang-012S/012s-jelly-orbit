@@ -63,7 +63,7 @@ describe('Tide realtime rules', () => {
   })
 })
 
-describe('five playable prototype levels', () => {
+describe('ten playable stages', () => {
   for (const level of TIDE_LEVELS) {
     it(`stage ${level.id} supports interleaved launches without overflowing the dock`, () => {
       let state = createTide(level)
@@ -80,7 +80,8 @@ describe('five playable prototype levels', () => {
     })
     it(`stage ${level.id} has balanced ammo and a verified winning route`, () => {
       expect(level.tiles).toHaveLength(level.size ** 2)
-      for (const color of COLORS) expect(level.lanes.flat().filter(j => j.color === color).reduce((sum, j) => sum + j.energy, 0)).toBe(level.tiles.filter(t => t === color).length)
+      expect(level.ice).toHaveLength(level.tiles.length)
+      for (const color of COLORS) expect(level.lanes.flat().filter(j => j.color === color).reduce((sum, j) => sum + j.energy, 0)).toBe(level.tiles.reduce((sum, tile, i) => sum + (tile === color ? 1 + level.ice[i] : 0), 0))
       let state = createTide(level)
       for (let move = 0; move < 200 && state.phase === 'playing'; move++) {
         const choice = hintMove(state, level.size)
@@ -92,4 +93,62 @@ describe('five playable prototype levels', () => {
       expect(state.phase).toBe('won')
     })
   }
+})
+
+describe('ice and streaks', () => {
+  it('resolves two simultaneous hits on an iced tile without double-spending or negative ice', () => {
+    const state = createTide(TIDE_LEVELS[5])
+    state.tiles = ['yellow', null, null, null]
+    state.ice = [1, 0, 0, 0]
+    state.swimmers = [{ id: 'first', color: 'yellow', energy: 1, age: 0 }, { id: 'second', color: 'yellow', energy: 1, age: 0 }]
+    const next = stepTide(state, 2)
+    expect(next.shots.map(shot => shot.cracked)).toEqual([true, false])
+    expect(next.ice[0]).toBe(0)
+    expect(next.swimmers).toHaveLength(0)
+    expect(next.phase).toBe('won')
+    expect(next.clearedColors).toEqual(['yellow'])
+  })
+  it('spends one bubble cracking ice, keeps the tile blocking, then clears on the next matching hit', () => {
+    const state = createTide(TIDE_LEVELS[5])
+    state.tiles = ['yellow', 'pink', null, null]
+    state.ice = [1, 0, 0, 0]
+    state.swimmers = [{ id: 'test', color: 'yellow', energy: 2, age: 0 }]
+    const cracked = stepTide(state, 2)
+    expect(cracked.tiles[0]).toBe('yellow')
+    expect(cracked.ice[0]).toBe(0)
+    expect(cracked.swimmers[0].energy).toBe(1)
+    expect(cracked.shots[0].cracked).toBe(true)
+    expect(rayTarget(cracked.tiles, 2, 3, 1)).toBe(0)
+    const cleared = stepTide(cracked, 2)
+    expect(cleared.tiles[0]).toBeNull()
+    expect(cleared.clearedColors).toContain('yellow')
+    expect(cleared.combo).toBe(2)
+    expect(state.ice[0]).toBe(1) // Old snapshots remain valid for undo.
+  })
+  it('does not crack ice with the wrong color', () => {
+    const state = createTide(TIDE_LEVELS[5])
+    state.swimmers = [{ id: 'wrong', color: 'purple', energy: 3, age: 0 }]
+    const next = settle(state, 8)
+    expect(next.ice).toEqual(state.ice)
+    expect(next.pool[0].energy).toBe(3)
+  })
+  it('conserves ammo against remaining tiles plus ice during concurrent play', () => {
+    let state = createTide(TIDE_LEVELS[9])
+    for (let tick = 0; tick < 4000 && state.phase === 'playing'; tick++) {
+      const move = hintMove(state, 12)
+      if (move && tick % 5 === 0) state = launch(state, move.source, move.index)
+      const next = stepTide(state, 12)
+      expect(energy(next)).toBe(next.tiles.filter(Boolean).length + next.ice.reduce((sum, n) => sum + n, 0))
+      expect(next.ice.every((n, i) => n === 0 || Boolean(next.tiles[i]))).toBe(true)
+      state = next
+    }
+    expect(state.phase).toBe('won')
+  })
+  it('expires a combo after a quiet interval without losing the best streak', () => {
+    const state = createTide(TIDE_LEVELS[0])
+    state.combo = 8; state.bestCombo = 8; state.lastHitTick = 0; state.tick = 12
+    const next = stepTide(state, 8)
+    expect(next.combo).toBe(0)
+    expect(next.bestCombo).toBe(8)
+  })
 })
